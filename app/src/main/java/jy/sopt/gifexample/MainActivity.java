@@ -2,10 +2,8 @@ package jy.sopt.gifexample;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
-import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
@@ -15,12 +13,9 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.provider.DocumentsContract;
-import android.provider.MediaStore;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.SeekBar;
@@ -50,7 +45,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     Button loadbtn, playbtn, pausebtn, capturebtn, savebtn;
     Handler updateHandler = new Handler();
     List<Bitmap> list;
-//    RcvAdapter rcvAdapter;
 
     MediaMetadataRetriever mediaMetadataRetriever;
 
@@ -58,11 +52,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        initView();
+        seekBarSetting();
+        permissionCheck();
 
+    }
 
+    public void initView(){
         videoView = (VideoView)findViewById(R.id.videoView);
-//        MediaController mc = new MediaController(this);
-//        videoView.setMediaController(mc);
         rcv = (RecyclerView) findViewById(R.id.rcv);
         curTime = (TextView) findViewById(R.id.turTime);
         totalTime = (TextView) findViewById(R.id.totalTime);
@@ -76,9 +73,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         playbtn.setOnClickListener(this);
         pausebtn.setOnClickListener(this);
         savebtn.setOnClickListener(this);
-
         seekBar = (SeekBar)findViewById(R.id.seekBar);
+        mediaMetadataRetriever = new MediaMetadataRetriever();
+    }
 
+    public void seekBarSetting(){
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
@@ -94,16 +93,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 videoView.seekTo(seekBar.getProgress());
             }
         });
+    }
 
-        mediaMetadataRetriever = new MediaMetadataRetriever();
-
-        list = new ArrayList<>();
-//        rcv.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
-//        rcvAdapter = new RcvAdapter(list);
-//        rcv.setAdapter(rcvAdapter);
-
-
-
+    public void permissionCheck(){
         PermissionListener permissionlistener = new PermissionListener() {
             @Override
             public void onPermissionGranted() {
@@ -123,30 +115,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 .setDeniedMessage("If you reject permission,you can not use this service\n\nPlease turn on permissions at [Setting] > [Permission]")
                 .setPermissions(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 .check();
-
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_main, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
-    }
 
     @Override
     public void onClick(View view) {
@@ -166,11 +136,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 playVideo();
                 break;
             case R.id.btnPause:
-//                pauseVideo();
+                pauseVideo();
 
                 break;
             case R.id.capture_btn:
-                captureShot();
+                captureFrame();
                 break;
             case R.id.save_btn:
                 saveGIF();
@@ -184,7 +154,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         AnimatedGifEncoder encoder = new AnimatedGifEncoder();
         encoder.setDelay(100);
-//        encoder.setRepeat(2);
         encoder.start(bos);
 
         for (Bitmap bitmap : list) {
@@ -192,8 +161,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
         list.clear();
         encoder.finish();
-
-        Log.d("sdf", "끝 " + list.size());
 
         return bos.toByteArray();
     }
@@ -234,7 +201,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     @SuppressLint("NewApi")
-    public static String getPath(final Context context, final Uri uri) {
+    public String getPath(final Context context, final Uri uri) {
 
         final boolean isKitKat = Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT;
 
@@ -251,120 +218,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
 
             }
-            // DownloadsProvider
-            else if (isDownloadsDocument(uri)) {
-
-                final String id = DocumentsContract.getDocumentId(uri);
-                final Uri contentUri = ContentUris.withAppendedId(
-                        Uri.parse("content://downloads/public_downloads"), Long.valueOf(id));
-
-                return getDataColumn(context, contentUri, null, null);
-            }
-            // MediaProvider
-            else if (isMediaDocument(uri)) {
-                final String docId = DocumentsContract.getDocumentId(uri);
-                final String[] split = docId.split(":");
-                final String type = split[0];
-
-                Uri contentUri = null;
-                if ("image".equals(type)) {
-                    contentUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
-                } else if ("video".equals(type)) {
-                    contentUri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI;
-                } else if ("audio".equals(type)) {
-                    contentUri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
-                }
-
-                final String selection = "_id=?";
-                final String[] selectionArgs = new String[] {
-                        split[1]
-                };
-
-                return getDataColumn(context, contentUri, selection, selectionArgs);
-            }
-        }
-        // MediaStore (and general)
-        else if ("content".equalsIgnoreCase(uri.getScheme())) {
-
-            // Return the remote address
-            if (isGooglePhotosUri(uri))
-                return uri.getLastPathSegment();
-
-            return getDataColumn(context, uri, null, null);
-        }
-        // File
-        else if ("file".equalsIgnoreCase(uri.getScheme())) {
-            return uri.getPath();
-        }
-
-        return null;
-    }
-
-    /**
-     * Get the value of the data column for this Uri. This is useful for
-     * MediaStore Uris, and other file-based ContentProviders.
-     *
-     * @param context The context.
-     * @param uri The Uri to query.
-     * @param selection (Optional) Filter used in the query.
-     * @param selectionArgs (Optional) Selection arguments used in the query.
-     * @return The value of the _data column, which is typically a file path.
-     */
-    public static String getDataColumn(Context context, Uri uri, String selection,
-                                       String[] selectionArgs) {
-
-        Cursor cursor = null;
-        final String column = "_data";
-        final String[] projection = {
-                column
-        };
-
-        try {
-            cursor = context.getContentResolver().query(uri, projection, selection, selectionArgs,
-                    null);
-            if (cursor != null && cursor.moveToFirst()) {
-                final int index = cursor.getColumnIndexOrThrow(column);
-                return cursor.getString(index);
-            }
-        } finally {
-            if (cursor != null)
-                cursor.close();
         }
         return null;
     }
 
 
-    /**
-     * @param uri The Uri to check.
-     * @return Whether the Uri authority is ExternalStorageProvider.
-     */
-    public static boolean isExternalStorageDocument(Uri uri) {
+
+
+    public boolean isExternalStorageDocument(Uri uri) {
         return "com.android.externalstorage.documents".equals(uri.getAuthority());
     }
 
-    /**
-     * @param uri The Uri to check.
-     * @return Whether the Uri authority is DownloadsProvider.
-     */
-    public static boolean isDownloadsDocument(Uri uri) {
-        return "com.android.providers.downloads.documents".equals(uri.getAuthority());
-    }
-
-    /**
-     * @param uri The Uri to check.
-     * @return Whether the Uri authority is MediaProvider.
-     */
-    public static boolean isMediaDocument(Uri uri) {
-        return "com.android.providers.media.documents".equals(uri.getAuthority());
-    }
-
-    /**
-     * @param uri The Uri to check.
-     * @return Whether the Uri authority is Google Photos.
-     */
-    public static boolean isGooglePhotosUri(Uri uri) {
-        return "com.google.android.apps.photos.content".equals(uri.getAuthority());
-    }
 
     public void loadVideo(Uri uri) {
 
@@ -374,23 +238,22 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         // 토스트 다이얼로그를 이용하여 버퍼링중임을 알린다.
         videoView.setOnInfoListener(new MediaPlayer.OnInfoListener() {
-
-                                        @Override
-                                        public boolean onInfo(MediaPlayer mp, int what, int extra) {
-                                            switch(what){
-                                                case MediaPlayer.MEDIA_INFO_BUFFERING_START:
-                                                    // Progress Diaglog 출력
-//                                                    Toast.makeText(getApplicationContext(), "Buffering", Toast.LENGTH_LONG).show();
-                                                    break;
-                                                case MediaPlayer.MEDIA_INFO_BUFFERING_END:
-                                                    // Progress Dialog 삭제
-//                                                    Toast.makeText(getApplicationContext(), "Buffering finished.\nResume playing", Toast.LENGTH_LONG).show();
-                                                    videoView.start();
-                                                    break;
-                                            }
-                                            return false;
-                                        }
-                                    }
+             @Override
+             public boolean onInfo(MediaPlayer mp, int what, int extra) {
+                   switch(what){
+                      case MediaPlayer.MEDIA_INFO_BUFFERING_START:
+                      //  Progress Diaglog 출력
+                      Toast.makeText(getApplicationContext(), "Buffering", Toast.LENGTH_LONG).show();
+                      break;
+                      case MediaPlayer.MEDIA_INFO_BUFFERING_END:
+                      // Progress Dialog 삭제
+                      Toast.makeText(getApplicationContext(), "Buffering finished.\nResume playing", Toast.LENGTH_LONG).show();
+                      videoView.start();
+                      break;
+                      }
+                      return false;
+                    }
+                }
 
         );
 
@@ -408,8 +271,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 seekBar.setMax((int) finalTime);
                 seekBar.setProgress(0);
                 updateHandler.postDelayed(updateVideoTime, 100);
-                //Toast Box
-//                Toast.makeText(getApplicationContext(), "Playing Video", Toast.LENGTH_SHORT).show();
+
             }
         });
 
@@ -420,38 +282,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     }
 
-    public void captureShot(){
+    public void captureFrame(){
         int currentPosition = videoView.getCurrentPosition();
 
-        Log.d("sdf", videoView.getDuration()+"");
+        for(int i = currentPosition; i<videoView.getDuration(); i+=300) {
+            Bitmap bitmap = mediaMetadataRetriever
+                    .getFrameAtTime(i * 1000);
+            list.add(Bitmap.createScaledBitmap(bitmap, 500, 500, true));
 
-        int cnt = 0;
-        for(int i = 1; i<videoView.getDuration(); i+=300) {
-//            Bitmap bitmap = mediaMetadataRetriever
-//                    .getFrameAtTime(i * 1000);
-//            list.add(Bitmap.createScaledBitmap(bitmap, 500, 500, true));
-//            bitmap.recycle();
-            if(cnt == 30)
-                break;
-            cnt++;
-            list.add(mediaMetadataRetriever
-                    .getFrameAtTime(i * 1000));
+            bitmap.recycle();
         }
-        Log.d("sdf", "끝 " + list.size());
-//        rcvAdapter.updateItem(list);
-
-
-//        if(bmFrame == null){
-//            Toast.makeText(MainActivity.this,
-//                    "bmFrame == null!",
-//                    Toast.LENGTH_LONG).show();
-//        }else{
-//            list.add(bmFrame);
-
-
-//            rcvAdapter.updateItem(list);
-//        }
-
     }
 
 
